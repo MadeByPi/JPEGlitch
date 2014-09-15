@@ -1,0 +1,80 @@
+<project name="Build SWC asset library" basedir="." default="buildAssetLibrary">
+	
+	<!-- load user configuration properties -->
+	<property file="build.properties" />
+	
+	<!-- setup flex sdk tasks -->
+	<taskdef resource="flexTasks.tasks" classpath="${FLEX_HOME}/ant/lib/flexTasks.jar" />
+	
+	<!-- setup ant contrib tasks -->
+	<taskdef resource="net/sf/antcontrib/antlib.xml" />
+	
+	<!-- create the temporary asset classes from the template -->
+	<target name="createTemporaryClasses">
+		<path id="assetList">
+			<fileset dir="${assets.dir}" includes="*.${assets.extension}"/>
+		</path>
+		<pathconvert targetos="windows" property="assetList2" pathsep="," refid="assetList">
+			<mapper>
+				<chainedmapper>
+					<flattenmapper/>
+					<globmapper from="*.${assets.extension}" to="*"/>
+				</chainedmapper>
+			</mapper>
+		</pathconvert>
+		<for param="file" list="${assetList2}">
+			<sequential>
+				<copy filtering="true" file="${src.ASTemplate}" tofile="${src.dir}/${src.classesDir}/${lib.classNamePrefix}@{file}.as">
+					<filterset>
+						<filter token="ASSET_NAME" value="@{file}"/>
+						<filter token="ASSET_PATH" value="${assets.relativeDir}"/>
+						<filter token="ASSET_EXTENSION" value="${assets.extension}"/>
+					</filterset>
+				</copy>
+			</sequential>
+		</for>
+	</target>
+	
+	<!-- build the swc -->
+	<target name="build SWC">
+		<!-- get all the classes to add to the swc -->
+		<path id="classList">
+			<fileset dir="${src.dir}">
+				<include name="${src.classesDir}/*.as"/>
+			</fileset>
+		</path>
+		
+		<!-- convert all the class file locations into a list of class-paths to pass to the include-classes paramater of compc -->
+		<pathconvert property="classList2" pathsep=" " dirsep="." refid="classList">
+			<mapper>
+				<chainedmapper>
+					<flattenmapper/>
+					<globmapper from="*.as" to="${src.packagePath}.*"/>
+				</chainedmapper>
+			</mapper>
+		</pathconvert>
+		
+		<!-- compile all classes listed into a swc -->
+		<!-- NOTE: if you're compiling a large library swc, compc/Java may run out of memory. Increase java's heap size if this happens -->
+		<compc output="${lib.swcPath}" include-classes="${classList2}">
+			<source-path path-element="${src.dir}"/>
+		</compc>
+	</target>
+	
+	<!-- remove the generated classes -->
+	<target name="deleteTemporaryClasses">
+		<!-- delete the temporary generated classes -->
+		<delete>
+			<fileset dir="${src.dir}">
+				<include name="${src.classesDir}/*.as"/>
+			</fileset>
+		</delete>
+		<echo>Deleted temporary classes</echo>
+	</target>
+	
+	<!-- run everything needed to build the library, then clean-up -->
+	<target name="buildAssetLibrary" depends="createTemporaryClasses, build SWC, deleteTemporaryClasses">
+		<echo>Asset library built to ${lib.swcPath}</echo>
+	</target>
+	
+</project>
